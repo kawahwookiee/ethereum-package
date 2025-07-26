@@ -94,9 +94,9 @@ def launch_assertoor(
         config_template, template_data
     )
     template_and_data_by_rel_dest_filepath = {}
-    template_and_data_by_rel_dest_filepath[
-        ASSERTOOR_CONFIG_FILENAME
-    ] = template_and_data
+    template_and_data_by_rel_dest_filepath[ASSERTOOR_CONFIG_FILENAME] = (
+        template_and_data
+    )
 
     config_files_artifact_name = plan.render_templates(
         template_and_data_by_rel_dest_filepath, "assertoor-config"
@@ -114,6 +114,7 @@ def launch_assertoor(
         public_ports,
         global_node_selectors,
         docker_cache_params,
+        participant_contexts,
     )
 
     plan.add_service(SERVICE_NAME, config)
@@ -127,6 +128,7 @@ def get_config(
     public_ports,
     node_selectors,
     docker_cache_params,
+    participant_contexts,
 ):
     config_file_path = shared_utils.path_join(
         ASSERTOOR_CONFIG_MOUNT_DIRPATH_ON_SERVICE,
@@ -151,6 +153,35 @@ def get_config(
                 )
                 + "ethpandaops/assertoor:fulu-support"
             )
+
+    ready_conditions = []
+    for participant in participant_contexts:
+        # Add a readiness condition for the EL client
+        ready_conditions.append(
+            ReadyCondition(
+                service_name=participant.el_context.service_name,
+                port_id=participant.el_context.rpc_port_id,
+                path="/",
+                initial_delay_seconds=10,
+                retries=10,
+                retry_backoff_seconds=5,
+                body='{"jsonrpc": "2.0", "method": "eth_syncing", "params": [], "id": 1}',
+                expected_response='"result":false',
+            )
+        )
+        # Add a readiness condition for the CL client
+        ready_conditions.append(
+            ReadyCondition(
+                service_name=participant.cl_context.service_name,
+                port_id=participant.cl_context.http_port_id,
+                path="/eth/v1/node/syncing",
+                initial_delay_seconds=10,
+                retries=10,
+                retry_backoff_seconds=5,
+                expected_response='"is_syncing":false',
+            )
+        )
+
     return ServiceConfig(
         image=IMAGE_NAME,
         ports=USED_PORTS,
@@ -166,6 +197,7 @@ def get_config(
         min_memory=MIN_MEMORY,
         max_memory=MAX_MEMORY,
         node_selectors=node_selectors,
+        ready_conditions=ready_conditions,
     )
 
 
