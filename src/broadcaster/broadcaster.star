@@ -1,3 +1,6 @@
+shared_utils = import_module("../shared_utils/shared_utils.star")
+constants = import_module("../package_io/constants.star")
+
 IMAGE_NAME = "nethermind/broadcaster:latest"
 SERVICE_NAME = "broadcaster"
 PORT = 8545
@@ -18,8 +21,13 @@ def get_config(
     all_el_contexts,
     node_selectors,
 ):
+    used_port_assignments = {
+        constants.RPC_PORT_ID: PORT,
+    }
+    used_ports = shared_utils.get_port_specs(used_port_assignments)
     return ServiceConfig(
         image=IMAGE_NAME,
+        ports=used_ports,
         cmd=[
             "http://{0}:{1}".format(context.ip_addr, context.rpc_port_num)
             for context in all_el_contexts
